@@ -11,10 +11,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - kubernetes.jele.website
+    - myservice.jele.website
     secretName: external-domain-tls
   rules:
-  - host: kubernetes.jele.website
+  - host: myservice.jele.website
     http:
       paths:
       - path: /helloworld
