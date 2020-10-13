@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: BRANCH_NAME
+  name: hwservice
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: hwservice
+  template:
+    metadata:
+      labels:
+        app: hwservice
+    spec:
+      containers:
+        - name: hwservice
+          image: $CI_REGISTRY/root/$CI_PROJECT_NAME/hwservice:$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID
+          ports:
+            - containerPort: 8080
+            
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  namespace: BRANCH_NAME
+  name: hwservice
+spec:
+  selector:
+    app: hwservice
+  ports:
+    - name: service
+      port: 8080
+

@@ -1,0 +1,29 @@
+<project
+    xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>jelastic</groupId>
+    <artifactId>helloworld</artifactId>
+    <version>0.1-SNAPSHOT</version>
+    <packaging>war</packaging>
+    <name>${project.artifactId}</name>
+    <url>http://maven.apache.org</url>
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>com.jelastic</groupId>
+                <artifactId>jelastic-maven-plugin</artifactId>
+                <version>1.9</version>
+                <configuration>
+                    <apiToken>${TOKEN}</apiToken>
+                    <context>${CONTEXT}</context>
+                    <environment>${TARGET_ENV}</environment>
+                    <comment>test-plugin</comment>
+                    <api_hoster>${JELASTIC_API_ENDPOINT}</api_hoster>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

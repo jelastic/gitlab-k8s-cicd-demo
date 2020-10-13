@@ -1,0 +1,111 @@
+image: docker:dind
+services:
+  - docker:dind
+
+variables:
+  SPRING_PROFILES_ACTIVE: gitlab-ci
+  DOCKER_DRIVER: overlay2
+  CI_REGISTRY_IMAGE: $CI_REGISTRY/root/$CI_PROJECT_NAME/hwservice:$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID
+
+cache:
+  paths:
+    - .m2/repository/
+    - service/target/
+    
+stages:
+  - test-variables
+  - build
+  - test
+  - package
+  - deploy-topology
+  - deploy-version
+  
+test_variable:
+  stage: test
+  script:
+    - echo $K8S_SERVER
+    - echo $K8S_TOKEN
+    - echo $K8S_CA_B64
+    - echo $CI_REGISTRY_PASSWORD
+    - echo $CI_REGISTRY_USER
+    - echo $CI_REGISTRY
+    - echo $CI_PROJECT_NAME
+
+hw-service-build:
+  image: maven:3.6.3-jdk-13
+  stage: build
+  script: |-
+        cd service
+        mvn package -B -X
+  retry: 2  
+  only:
+    changes:
+      - Dockerfile
+      - service/**/*
+  artifacts:
+    paths:
+      - service/target/*.war
+      
+hw-service-test:
+  image: maven:3-jdk-8
+  stage: test
+  script: "echo TEST OK"
+  only:
+    changes:
+      - service/**/*
+
+hw-service-package:
+  stage: package
+  image: docker:dind
+  needs: ["hw-service-build"]
+  services:
+  - docker:dind
+  script: |-
+         while true; do [ -S "/var/run/docker.sock" ] && break; echo "Waiting for docker socket"; sleep 3; done
+         echo Artifact to deploy: $(ls -1 ./service/target/*.war)
+         docker build -t $CI_REGISTRY_IMAGE .
+         docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+         docker push $CI_REGISTRY_IMAGE
+  retry: 2
+  only:
+    changes:
+      - Dockerfile
+      - server/**/*
+ 
+deploy-topology:
+  stage: deploy-topology
+  image: dtzar/helm-kubectl
+  script: |-
+      kubectl config set-cluster k8s --server="$K8S_SERVER"
+      kubectl config set clusters.k8s.certificate-authority-data "$K8S_CA_B64"
+      kubectl config set-credentials gitlab --token="$K8S_TOKEN"
+      kubectl config set-context default --cluster=k8s --user=gitlab
+      kubectl config use-context default
+      sed -i "s/BRANCH_NAME/$CI_COMMIT_REF_NAME/g" topology/*.yml
+      kubectl apply -f topology/namespace.yml
+      kubectl apply -f topology/hwservice.yml
+  only:
+    changes:
+      - topology/**/*
+
+
+deploy-service:
+  image: google/cloud-sdk
+  stage: deploy-version
+  script: |-
+        echo "Deploying HW Service"
+        echo "Executed in runnner:" $(hostname)
+        kubectl config set-cluster k8s --server="$K8S_SERVER"
+        kubectl config set clusters.k8s.certificate-authority-data "$K8S_CA_B64"
+        kubectl config set-credentials gitlab --token="$K8S_TOKEN"
+        kubectl config set-context default --cluster=k8s --user=gitlab
+        kubectl config use-context default
+        kubectl set image deployment hwservice hwservice=$CI_REGISTRY_IMAGE -n $CI_COMMIT_REF_NAME
+        echo "HW Service Deployment Compleated, version:" $CI_REGISTRY_IMAGE
+        kubectl apply -f topology/ingress.yml
+        echo "Application is available by the context: /helloworld"
+
+  only:
+    changes:
+      - service/**/*
+  
