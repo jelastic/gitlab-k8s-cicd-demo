@@ -87,6 +87,7 @@ deploy-topology:
   only:
     changes:
       - topology/**/*
+      - service/**/*
 
 
 deploy-service:
