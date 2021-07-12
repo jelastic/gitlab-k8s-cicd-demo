@@ -5,7 +5,7 @@ services:
 variables:
   SPRING_PROFILES_ACTIVE: gitlab-ci
   DOCKER_DRIVER: overlay2
-  CI_REGISTRY_IMAGE: $CI_REGISTRY/root/$CI_PROJECT_NAME/hwservice:$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID
+  CI_REGISTRY_IMAGE: $CI_REGISTRY_USER/hwservice:$CI_COMMIT_REF_NAME
 
 cache:
   paths:
@@ -18,7 +18,6 @@ stages:
   - test
   - package
   - deploy-topology
-  - deploy-version
   
 test_variable:
   stage: test
@@ -28,8 +27,6 @@ test_variable:
     - echo $K8S_CA_B64
     - echo $CI_REGISTRY_PASSWORD
     - echo $CI_REGISTRY_USER
-    - echo $CI_REGISTRY
-    - echo $CI_PROJECT_NAME
 
 hw-service-build:
   image: maven:3.6.3-jdk-13
@@ -64,7 +61,7 @@ hw-service-package:
          while true; do [ -S "/var/run/docker.sock" ] && break; echo "Waiting for docker socket"; sleep 3; done
          echo Artifact to deploy: $(ls -1 ./service/target/*.war)
          docker build -t $CI_REGISTRY_IMAGE .
-         docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+         docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
          docker push $CI_REGISTRY_IMAGE
   retry: 2
   only:
@@ -83,30 +80,13 @@ deploy-topology:
       kubectl config use-context default
       sed -i "s/BRANCH_NAME/$CI_COMMIT_REF_NAME/g" topology/*.yml
       kubectl apply -f topology/namespace.yml
+      sed -i "s/image:\ /image:\ $CI_REGISTRY_USER\/hwservice:$CI_COMMIT_REF_NAME/g" topology/*.yml
       kubectl apply -f topology/hwservice.yml
+      echo "HW Service Deployment Compleated, version:" $CI_REGISTRY_IMAGE
+      kubectl apply -f topology/ingress.yml
+      echo "Application is available by the context: /helloworld"
+
   only:
     changes:
       - topology/**/*
       - service/**/*
-
-
-deploy-service:
-  image: google/cloud-sdk
-  stage: deploy-version
-  script: |-
-        echo "Deploying HW Service"
-        echo "Executed in runnner:" $(hostname)
-        kubectl config set-cluster k8s --server="$K8S_SERVER"
-        kubectl config set clusters.k8s.certificate-authority-data "$K8S_CA_B64"
-        kubectl config set-credentials gitlab --token="$K8S_TOKEN"
-        kubectl config set-context default --cluster=k8s --user=gitlab
-        kubectl config use-context default
-        kubectl set image deployment hwservice hwservice=$CI_REGISTRY_IMAGE -n $CI_COMMIT_REF_NAME
-        echo "HW Service Deployment Completed, version:" $CI_REGISTRY_IMAGE
-        kubectl apply -f topology/ingress.yml
-        echo "Application is available by the context: /helloworld"
-
-  only:
-    changes:
-      - service/**/*
-  

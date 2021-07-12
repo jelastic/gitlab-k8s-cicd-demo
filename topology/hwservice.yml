@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: hwservice
-          image: $CI_REGISTRY/root/$CI_PROJECT_NAME/hwservice:$CI_COMMIT_REF_NAME-$CI_PIPELINE_ID
+          image: 
           ports:
             - containerPort: 8080
             
