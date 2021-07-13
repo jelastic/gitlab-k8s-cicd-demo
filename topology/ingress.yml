@@ -3,7 +3,6 @@ kind: Ingress
 metadata:
   name: gitlab-hwservice-app
   namespace: master
-spec:
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -18,5 +17,6 @@ spec:
             name: hwservice
             port: 
                 number: 8080
+
 
 
